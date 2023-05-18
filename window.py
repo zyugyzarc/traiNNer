@@ -7,13 +7,53 @@ SOCKETRADIUS = 6
 INPUT = 0
 OUTPUT = 1
 
+class Edge(QGraphicsItem):
+    def __init__(self, fromsock, tosock):
+        super().__init__(fromsock)
+        self.fr = fromsock
+        self.to = tosock
+        self.point = None
+
+        self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
+
+    def paint(self, painter, QStyleGraphicsItem, widget=None):
+
+        offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*self.fr.node.size)
+
+        self.setPos(self.fr.pos() + offset)
+
+        self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
+
+        p1 = QPointF(0, 0)
+        p2 = self.delta
+
+        grad = QLinearGradient(p1, p2)
+        grad.setColorAt(0, Qt.red)
+        grad.setColorAt(1, Qt.blue)
+
+        pen = QPen(QBrush(grad), 1.5)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+
+        path = QPainterPath(p1)
+        path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
+
+        painter.drawPath(path)
+
+    def boundingRect(self):
+
+        return QRectF(
+            QPointF(0, 0),
+            self.delta
+        )
+
 class Socket(QGraphicsItem):
 
     def __init__(self, node, name="undefined", color='#ff0000', type=INPUT):
 
         super().__init__(node)
 
-        self.other = None
+        self.edges = []
 
         self.node = node
 
@@ -35,6 +75,8 @@ class Socket(QGraphicsItem):
         self.node.sockets.append(self)
         self.set_position()
 
+    def mousePressEvent(self, event): print(self, event)
+
     def set_position(self):
 
         ypos = EDGERADIUS*3+4*self.index*SOCKETRADIUS
@@ -46,41 +88,26 @@ class Socket(QGraphicsItem):
             self.setPos(self.node.size[0] - SOCKETRADIUS, self.node.size[1] - ypos)
 
     def boundingRect(self):
-        if self.other:
-            offset = QPointF(EDGERADIUS + SOCKETRADIUS, EDGERADIUS*3 + SOCKETRADIUS) - QPointF(self.node.size[0], self.node.size[1])
-            p2 = self.other.pos() + self.other.node.pos() - self.node.pos() + offset
-            return QRectF(QPointF(0, 0), p2).normalized()
-        else:
-            return QRectF(0, 0, self.node.size[0]+SOCKETRADIUS, EDGERADIUS).normalized()
+        return QRectF(0, 0, self.node.size[0]+SOCKETRADIUS, EDGERADIUS).normalized()
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
-
-        if self.other: self.draw_edge(painter)
 
         painter.setPen(self.outline)
         painter.setBrush(self.color)
 
         painter.drawEllipse(0, 0, SOCKETRADIUS*2, SOCKETRADIUS*2)
-        
-    def draw_edge(self, painter):
-
-        pen = QPen(Qt.white); pen.setWidthF(1.5)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-
-        offset = QPointF(-EDGERADIUS - SOCKETRADIUS, EDGERADIUS*4)# - QPointF(self.node.size[0], self.node.size[1])
-        p1 = self.pos() - offset
-        p2 = self.other.pos() + self.other.node.pos() - self.node.pos() - offset
-
-        path = QPainterPath(p1)
-        path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
-
-        painter.drawPath(path)
 
     def connect(self, other):
-        self.other = other
-        other.self = self
+
+        edge = Edge(self, other)
+        self.edges.append(edge)
+        other.edges.append(edge)
     
+    def absPos(self):
+        return self.pos() + self.node.pos()
+    
+    def __repr__(self):
+        return f"<Socket {self.name} at {self.node}>"
 
 class Node(QGraphicsItem):
     def __init__(self, scene, title="Undefined"):
@@ -152,6 +179,9 @@ class Node(QGraphicsItem):
     @title.setter
     def title(self, value):
         self._title=value; self.title_item.setPlainText(self._title)
+
+    def __repr__(self):
+        return f"<Node {self._title}>"
 
 
 class View(QGraphicsView):
