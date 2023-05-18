@@ -18,7 +18,7 @@ class Edge(QGraphicsItem):
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
 
-        offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*self.fr.node.size)
+        offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to))
 
         self.setPos(self.fr.pos() + offset)
 
