@@ -8,15 +8,24 @@ INPUT = 0
 OUTPUT = 1
 
 class Edge(QGraphicsItem):
-    def __init__(self, fromsock, tosock):
+
+    def __init__(self, fromsock, tosock, point=None):
+        
         super().__init__(fromsock)
+
+        self.setFlag(QGraphicsItem.ItemStacksBehindParent)
+        if tosock: tosock.node.setZValue(fromsock.node.zValue()+1)
+        
+
         self.fr = fromsock
         self.to = tosock
-        self.point = None
+        self.point = point
 
         self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
+
+        self.setZValue(-10)
 
         offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to))
 
@@ -27,11 +36,12 @@ class Edge(QGraphicsItem):
         p1 = QPointF(0, 0)
         p2 = self.delta
 
-        grad = QLinearGradient(p1, p2)
-        grad.setColorAt(0, Qt.red)
-        grad.setColorAt(1, Qt.blue)
+        #grad = QLinearGradient(p1, p2)
+        #grad.setColorAt(0, Qt.red)
+        #grad.setColorAt(1, Qt.blue)
+        #pen = QPen(QBrush(grad), 1.5)
 
-        pen = QPen(QBrush(grad), 1.5)
+        pen = QPen(Qt.white, 1.5)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
 
@@ -68,14 +78,13 @@ class Socket(QGraphicsItem):
         self.text_item = QGraphicsTextItem(self.name, self)
         self.text_item.setFont(QFont("DejaVu Sans", 12))
         self.text_item.setDefaultTextColor(Qt.white)
-        self.text_item.setTextWidth(self.node.size[0] - EDGERADIUS*3)
-        self.text_item.setPos(EDGERADIUS*2 if self.type == INPUT else (- SOCKETRADIUS - self.text_item.textWidth()//2), -EDGERADIUS)
+        width = min(QFontMetrics(QFont("DejaVu Sans", 12)).width(self.name), self.node.size[0] - EDGERADIUS*3)
+        self.text_item.setTextWidth(width + 2*SOCKETRADIUS)
+        self.text_item.setPos(EDGERADIUS*2 if self.type == INPUT else (-EDGERADIUS*1 - width), -EDGERADIUS)
         self.node.scene.addItem(self.text_item)
 
         self.node.sockets.append(self)
         self.set_position()
-
-    def mousePressEvent(self, event): print(self, event)
 
     def set_position(self):
 
@@ -97,11 +106,13 @@ class Socket(QGraphicsItem):
 
         painter.drawEllipse(0, 0, SOCKETRADIUS*2, SOCKETRADIUS*2)
 
-    def connect(self, other):
+    def connect(self, other, edge=None):
 
-        edge = Edge(self, other)
+        if not edge: edge = Edge(self, other)
         self.edges.append(edge)
         other.edges.append(edge)
+
+        print(f"connected {self} to {other}")
     
     def absPos(self):
         return self.pos() + self.node.pos()
@@ -109,7 +120,10 @@ class Socket(QGraphicsItem):
     def __repr__(self):
         return f"<Socket {self.name} at {self.node}>"
 
+
+
 class Node(QGraphicsItem):
+
     def __init__(self, scene, title="Undefined"):
 
         super().__init__()
@@ -184,6 +198,7 @@ class Node(QGraphicsItem):
         return f"<Node {self._title}>"
 
 
+
 class View(QGraphicsView):
 
     def __init__(self, graphics, parent=None):
@@ -201,6 +216,16 @@ class View(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     def mousePressEvent(self, event):
+
+        if event.button() == Qt.LeftButton:
+            item = self.itemAt(event.pos())
+            print("clicked on", item)
+
+            if type(item) == Socket:
+                for i in self.graphics.selectedItems():
+                    i.setSelected(False)
+                item.node.setSelected(True)
+                return
 
         if event.button() == Qt.MiddleButton:
             
@@ -235,6 +260,7 @@ class View(QGraphicsView):
         dzoom = 1 + dzoom * 0.25
 
         self.scale(dzoom, dzoom)
+
 
 
 class Scene(QGraphicsScene):

@@ -20,6 +20,6 @@ n1 = TestNode(window.scene, '(N1)')
 
 n1.sockets[-1].connect(n2.sockets[1])
 
-print(f"connected n1.{n1.sockets[-1].name} to n2.{n2.sockets[0].name}")
+
 
 app.exec_()
