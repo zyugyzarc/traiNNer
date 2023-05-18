@@ -76,6 +76,10 @@ class Socket(QGraphicsItem):
         path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
 
         painter.drawPath(path)
+
+    def connect(self, other):
+        self.other = other
+        other.self = self
     
 
 class Node(QGraphicsItem):

@@ -19,7 +19,7 @@ n2 = TestNode(window.scene)
 n1.title += " (N1)"
 n2.title += " (N2)"
 
-n1.sockets[0].other = n2.sockets[-1]
+n1.sockets[0].connect(n2.sockets[-1])
 
 print(f"connected n1.{n1.sockets[0].name} to n2.{n2.sockets[-1].name}")
 
