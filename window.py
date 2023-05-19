@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+import sip
+
 EDGERADIUS = 8
 SOCKETRADIUS = 6
 INPUT = 0
@@ -23,15 +25,20 @@ class Edge(QGraphicsItem):
 
         self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
 
+        self.value = None
+
     def paint(self, painter, QStyleGraphicsItem, widget=None):
 
         self.setZValue(-10)
 
-        offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to))
+        offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to.node.size))
+        poff = - (self.fr if self.fr else self.to).pos()*3 + QPointF(0, (self.fr if self.fr else self.to).pos().y()*1.5) - QPointF(-EDGERADIUS*2-SOCKETRADIUS, SOCKETRADIUS*2+4*EDGERADIUS)
+        poff *= (self.fr if self.fr else self.to).node.scene.window.view.zoom 
+        #print((self.fr if self.fr else self.to).node.scene.window.view.zoom)
+
+        self.delta = (self.to.absPos() if self.to else self.point+poff) - (self.fr.absPos() if self.fr else self.point+poff)
 
         self.setPos(self.fr.pos() + offset)
-
-        self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
 
         p1 = QPointF(0, 0)
         p2 = self.delta
@@ -57,6 +64,7 @@ class Edge(QGraphicsItem):
             self.delta
         )
 
+
 class Socket(QGraphicsItem):
 
     def __init__(self, node, name="undefined", color='#ff0000', type=INPUT):
@@ -69,7 +77,10 @@ class Socket(QGraphicsItem):
 
         self.color = QBrush(QColor(color))
         self.outline = QPen(QColor('#101010'))
+        self.outline_sel = QPen(QColor('#FFB040'))
         self.outline.setWidthF(2)
+        self.outline_sel.setWidthF(2)
+        self.selected = False
 
         self.type = type
         self.name = name
@@ -101,7 +112,7 @@ class Socket(QGraphicsItem):
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
 
-        painter.setPen(self.outline)
+        painter.setPen(self.outline_sel if self.selected else self.outline)
         painter.setBrush(self.color)
 
         painter.drawEllipse(0, 0, SOCKETRADIUS*2, SOCKETRADIUS*2)
@@ -110,7 +121,12 @@ class Socket(QGraphicsItem):
 
         if not edge: edge = Edge(self, other)
         self.edges.append(edge)
-        other.edges.append(edge)
+        
+        if other:
+            other.edges.append(edge)
+        else:
+            sock = (edge.fr if edge.fr != self else edge.to)
+            sock.edges.append(edge)
 
         print(f"connected {self} to {other}")
     
@@ -158,6 +174,31 @@ class Node(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemIsMovable)
 
+    def eval(self):
+        
+        print("eval", self._title)
+
+        check = []
+        inputs = []
+        for sock in self.sockets:
+            if sock.type == INPUT:
+                edge = sock.edges[0]
+
+                if edge.fr.node not in check:
+                    edge.fr.node.eval()
+                    check.append(edge.fr.node)
+                
+                inputs.append(edge.value)
+
+        outputs = self.__eval__(*inputs); n = 0
+        if type(outputs) != tuple: outputs = (outputs,)
+
+        for sock in self.sockets:
+            if sock.type == OUTPUT:
+                for edge in sock.edges:
+                    edge.value = outputs[n]
+                    n+=1
+
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
 
@@ -197,6 +238,26 @@ class Node(QGraphicsItem):
     def __repr__(self):
         return f"<Node {self._title}>"
 
+    def __eval__(self, *_):
+        print("INVALID __EVAL__()")
+        return tuple()
+
+    def addWidget(self, widget):
+
+        proxy = QGraphicsProxyWidget(self)
+        proxy.setWidget(widget)
+
+        self.widgets.append(proxy)
+
+        widget.setFixedHeight(30)
+        widget.setFixedWidth(self.size[0] - EDGERADIUS*3)
+
+        ypos = EDGERADIUS*3+4*len([0 for i in self.sockets if i.type == INPUT])*SOCKETRADIUS
+        
+        proxy.setPos(EDGERADIUS, EDGERADIUS*2 + ypos)
+
+        return widget
+
 
 
 class View(QGraphicsView):
@@ -207,6 +268,7 @@ class View(QGraphicsView):
         
         self.graphics = graphics
         self.setScene(graphics)
+        self.zoom = 1
 
         self.setRenderHints(QPainter.Antialiasing | QPainter.HighQualityAntialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
 
@@ -214,6 +276,9 @@ class View(QGraphicsView):
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        self.currentEdge = None
+        self.currentSocket = None
 
     def mousePressEvent(self, event):
 
@@ -225,7 +290,18 @@ class View(QGraphicsView):
                 for i in self.graphics.selectedItems():
                     i.setSelected(False)
                 item.node.setSelected(True)
+                item.selected = True
+
+                self.currentSocket = item
+                self.currentEdge = Edge(item, None, event.pos())
+
                 return
+
+            else:
+
+                for node in self.graphics.nodes:
+                    for sock in node.sockets:    
+                        sock.selected = False
 
         if event.button() == Qt.MiddleButton:
             
@@ -241,7 +317,51 @@ class View(QGraphicsView):
 
         super().mousePressEvent(event)
 
+    def mouseMoveEvent(self, event):
+
+        if self.currentEdge:
+
+            item = self.itemAt(event.pos())
+
+            if type(item) == Socket and item != self.currentSocket:
+                self.currentEdge.to = item
+                self.currentEdge.point = None
+
+                for node in self.graphics.nodes:
+                    for sock in node.sockets:
+                        if sock != item or sock != self.currentSocket:
+                            sock.selected = False
+
+                item.selected = True
+                self.currentSocket.selected = True
+
+            else:
+                self.currentEdge.to = None
+                self.currentEdge.point = event.pos()
+
+            self.viewport().repaint()
+            #print(self.currentEdge.delta, self.currentEdge.to)
+
+        super().mouseMoveEvent(event)
+
     def mouseReleaseEvent(self, event):
+
+        if self.currentEdge:
+            if self.currentEdge.to and self.currentEdge.fr:
+
+                self.currentSocket.connect(None, self.currentEdge)
+
+                for node in self.graphics.nodes:
+                    for sock in node.sockets:    
+                        sock.selected = False
+            
+            else:
+                self.graphics.removeItem(self.currentEdge)
+                sip.delete(self.currentEdge)
+                del self.currentEdge
+            self.currentEdge = None
+
+            print("mouse release")
 
         if event.button() == Qt.MiddleButton:
 
@@ -259,18 +379,20 @@ class View(QGraphicsView):
         dzoom = 1 if event.angleDelta().y() > 0 else -1
         dzoom = 1 + dzoom * 0.25
 
+        self.zoom += dzoom/10
+
         self.scale(dzoom, dzoom)
 
 
 
 class Scene(QGraphicsScene):
 
-    def __init__(self, parent=None):
+    def __init__(self, window, parent=None):
     
         super().__init__(parent)
 
+        self.window = window
         self.nodes = []
-        self.edges = []
 
         self.init_graphics()
 
@@ -327,8 +449,6 @@ class Scene(QGraphicsScene):
         painter.setPen(self._pen_dark)
         painter.drawLines(*lines_dark)
 
-
-
 class AppWindow(QWidget):
 
     def __init__(self, parent=None):
@@ -340,7 +460,7 @@ class AppWindow(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self.layout)
 
-        self.scene = Scene()
+        self.scene = Scene(self)
 
         self.view = View(self.scene, self)
 
@@ -348,6 +468,3 @@ class AppWindow(QWidget):
 
         self.setWindowTitle("traiNNer")
         self.show()
-
-    
-
