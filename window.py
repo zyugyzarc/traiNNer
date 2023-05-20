@@ -18,6 +18,7 @@ class Edge(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemStacksBehindParent)
         if tosock: tosock.node.setZValue(fromsock.node.zValue()+1)
         
+        self.selected = False
 
         self.fr = fromsock
         self.to = tosock
@@ -32,30 +33,37 @@ class Edge(QGraphicsItem):
         self.setZValue(-10)
 
         offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to.node.size))
-        poff = - (self.fr if self.fr else self.to).pos()*3 + QPointF(0, (self.fr if self.fr else self.to).pos().y()*1.5) - QPointF(-EDGERADIUS*2-SOCKETRADIUS, SOCKETRADIUS*2+4*EDGERADIUS)
-        poff *= (self.fr if self.fr else self.to).node.scene.window.view.zoom 
+        poff = -QPointF(EDGERADIUS, EDGERADIUS)
         #print((self.fr if self.fr else self.to).node.scene.window.view.zoom)
 
         self.delta = (self.to.absPos() if self.to else self.point+poff) - (self.fr.absPos() if self.fr else self.point+poff)
+        #self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
 
         self.setPos(self.fr.pos() + offset)
 
         p1 = QPointF(0, 0)
         p2 = self.delta
 
-        #grad = QLinearGradient(p1, p2)
-        #grad.setColorAt(0, Qt.red)
-        #grad.setColorAt(1, Qt.blue)
-        #pen = QPen(QBrush(grad), 1.5)
+        grad = QLinearGradient(p1, p2)
+        grad.setColorAt(0, self.fr.color.color() if self.fr else QColor('#ffffff'))
+        grad.setColorAt(1, self.to.color.color() if self.to else QColor('#ffffff'))
 
-        pen = QPen(Qt.white, 1.5)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
+        pen = QPen(QBrush(grad), 2)
 
         path = QPainterPath(p1)
         path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
 
+        outlinePen = QPen(QColor("#000"), 5)
+
+        painter.setBrush(Qt.NoBrush)
+        
+        painter.setPen(outlinePen)
         painter.drawPath(path)
+
+        painter.setPen(pen)
+        painter.drawPath(path)
+
+        
 
     def boundingRect(self):
 
@@ -197,7 +205,7 @@ class Node(QGraphicsItem):
             if sock.type == OUTPUT:
                 for edge in sock.edges:
                     edge.value = outputs[n]
-                    n+=1
+                n+=1
 
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
@@ -294,6 +302,7 @@ class View(QGraphicsView):
 
                 self.currentSocket = item
                 self.currentEdge = Edge(item, None, event.pos())
+                self.currentEdge.selected = True
 
                 return
 
@@ -333,11 +342,10 @@ class View(QGraphicsView):
                             sock.selected = False
 
                 item.selected = True
-                self.currentSocket.selected = True
 
             else:
                 self.currentEdge.to = None
-                self.currentEdge.point = event.pos()
+                self.currentEdge.point = self.mapToScene(event.pos())
 
             self.viewport().repaint()
             #print(self.currentEdge.delta, self.currentEdge.to)
@@ -354,11 +362,13 @@ class View(QGraphicsView):
                 for node in self.graphics.nodes:
                     for sock in node.sockets:    
                         sock.selected = False
+
+                self.currentEdge.selected = False
             
             else:
-                self.graphics.removeItem(self.currentEdge)
                 sip.delete(self.currentEdge)
                 del self.currentEdge
+
             self.currentEdge = None
 
             print("mouse release")
@@ -448,6 +458,7 @@ class Scene(QGraphicsScene):
 
         painter.setPen(self._pen_dark)
         painter.drawLines(*lines_dark)
+
 
 class AppWindow(QWidget):
 
