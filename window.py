@@ -3,6 +3,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 import sip
+import traceback
 
 EDGERADIUS = 8
 SOCKETRADIUS = 6
@@ -157,7 +158,7 @@ class Node(QGraphicsItem):
         self.sockets = []
         self.widgets = []
 
-        self.size = (150, 200)
+        if not hasattr(self, 'size'): self.size = (150, 200)
 
         self._title = title
 
@@ -198,7 +199,25 @@ class Node(QGraphicsItem):
                 
                 inputs.append(edge.value)
 
-        outputs = self.__eval__(*inputs); n = 0
+        try:
+            outputs = self.__eval__(*inputs)
+            self.title_item.setDefaultTextColor(QColor("#fff"))
+            self.title = self.title.replace(' (!)', '')
+            self.title_item.setToolTip("")
+        except Exception as E:
+            outputs = (E,)*10
+            self.title_item.setDefaultTextColor(QColor("#ff4040"))
+            self.title = self.title.replace(' (!)', '')
+            self.title += ' (!)'
+
+            print('=======')
+            print(f'During Eval of {self}')
+            print(traceback.format_exc())
+            print('=======')
+            self.title_item.setToolTip(repr(E).split('(')[0] + ': ' + str(E))
+
+        n = 0
+        
         if type(outputs) != tuple: outputs = (outputs,)
 
         for sock in self.sockets:
@@ -288,23 +307,43 @@ class View(QGraphicsView):
         self.currentEdge = None
         self.currentSocket = None
 
+    def contextMenuEvent(self, event):
+
+        menu = QMenu()
+        menu.addAction("Add node")
+        menu.addAction("Test")
+
+        menu.exec(event.globalPos())
+
     def mousePressEvent(self, event):
 
         if event.button() == Qt.LeftButton:
             item = self.itemAt(event.pos())
             print("clicked on", item)
 
-            if type(item) == Socket:
+            if type(item) == Socket and item.type == OUTPUT:
                 for i in self.graphics.selectedItems():
                     i.setSelected(False)
                 item.node.setSelected(True)
                 item.selected = True
 
                 self.currentSocket = item
-                self.currentEdge = Edge(item, None, event.pos())
+                self.currentEdge = Edge(item, None, self.mapToScene(event.pos()))
                 self.currentEdge.selected = True
 
                 return
+
+            elif type(item) == Socket and item.type == INPUT:
+
+                self.currentEdge = item.edges.pop()
+                self.currentEdge.fr.edges.pop()
+
+                self.currentEdge.selected = True
+                self.currentEdge.to = None
+
+                self.currentEdge.point = self.mapToScene(event.pos())
+
+                print("unlink", self.currentEdge)
 
             else:
 
