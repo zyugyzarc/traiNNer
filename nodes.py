@@ -49,3 +49,6 @@ class MathNode(Node):
     def __eval__(self, val1, val2):
         op = self.textedit.toPlainText()
         return str(eval(val1+op+val2))
+
+View.availableNodes = [j for i, j in globals().items() if i.endswith("Node") and i != 'Node']
+print(View.availableNodes)

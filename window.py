@@ -289,6 +289,8 @@ class Node(QGraphicsItem):
 
 class View(QGraphicsView):
 
+    availableNodes = []
+
     def __init__(self, graphics, parent=None):
 
         super().__init__(parent)
@@ -308,6 +310,11 @@ class View(QGraphicsView):
         self.currentSocket = None
 
     def contextMenuEvent(self, event):
+
+        addMenu = QMenu()
+
+        for node in self.availableNodes:
+            addMenu.addAction(str(node).replace("<class '", '')[:-2])
 
         menu = QMenu()
         menu.addAction("Add node")
