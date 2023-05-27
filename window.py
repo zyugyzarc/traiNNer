@@ -313,14 +313,30 @@ class View(QGraphicsView):
 
         addMenu = QMenu()
 
+        adds = {}
+
         for node in self.availableNodes:
-            addMenu.addAction(str(node).replace("<class '", '')[:-2])
+            adds[
+                addMenu.addAction(str(node).replace("<class 'nodes.", '').replace('Node\'>', ''))
+            ] = node
+
 
         menu = QMenu()
-        menu.addAction("Add node")
-        menu.addAction("Test")
+        menu.addMenu(addMenu)
+        act_DEL = menu.addAction("Delete")
 
-        menu.exec(event.globalPos())
+        action = menu.exec(event.globalPos())
+
+        if action == act_DEL:
+            print("NOTIMPLEMENTED STUB")
+        else:
+            if action in adds:
+                print("added", adds[action])
+                n = adds[action](self.graphics)
+                
+                n.setPos(
+                    self.mapToScene(event.globalPos())
+                )
 
     def mousePressEvent(self, event):
 
@@ -435,7 +451,7 @@ class View(QGraphicsView):
         dzoom = 1 if event.angleDelta().y() > 0 else -1
         dzoom = 1 + dzoom * 0.25
 
-        self.zoom += dzoom/10
+        self.zoom += dzoom
 
         self.scale(dzoom, dzoom)
 
