@@ -64,7 +64,9 @@ class Edge(QGraphicsItem):
         painter.setPen(pen)
         painter.drawPath(path)
 
-        
+    def updateNodes(self):
+        self.fr.node.update(self.fr)
+        self.to.node.update(self.to)
 
     def boundingRect(self):
 
@@ -137,6 +139,8 @@ class Socket(QGraphicsItem):
             sock = (edge.fr if edge.fr != self else edge.to)
             sock.edges.append(edge)
 
+            edge.updateNodes()
+
         print(f"connected {self} to {other}")
     
     def absPos(self):
@@ -193,7 +197,7 @@ class Node(QGraphicsItem):
             if sock.type == INPUT:
                 edge = sock.edges[0]
 
-                if edge.fr.node not in check:
+                if edge.fr.node not in check and not edge.fr.node.circular:
                     edge.fr.node.eval()
                     check.append(edge.fr.node)
                 
@@ -204,7 +208,12 @@ class Node(QGraphicsItem):
             self.title_item.setDefaultTextColor(QColor("#fff"))
             self.title = self.title.replace(' (!)', '')
             self.title_item.setToolTip("")
+
+        except KeyboardInterrupt:
+            print(self,": stop eval")
+
         except Exception as E:
+            
             outputs = (E,)*10
             self.title_item.setDefaultTextColor(QColor("#ff4040"))
             self.title = self.title.replace(' (!)', '')
@@ -279,11 +288,14 @@ class Node(QGraphicsItem):
         widget.setFixedHeight(30)
         widget.setFixedWidth(self.size[0] - EDGERADIUS*3)
 
-        ypos = EDGERADIUS*3+4*len([0 for i in self.sockets if i.type == INPUT])*SOCKETRADIUS
+        ypos = EDGERADIUS*3+4*(len([0 for i in self.sockets if i.type == INPUT]) + len(self.widgets) - 1)*SOCKETRADIUS
         
         proxy.setPos(EDGERADIUS, EDGERADIUS*2 + ypos)
 
         return widget
+
+    def update(self, sock):
+        pass
 
 
 
@@ -311,7 +323,7 @@ class View(QGraphicsView):
 
     def contextMenuEvent(self, event):
 
-        addMenu = QMenu()
+        addMenu = QMenu("Add Node")
 
         adds = {}
 
@@ -323,20 +335,17 @@ class View(QGraphicsView):
 
         menu = QMenu()
         menu.addMenu(addMenu)
-        act_DEL = menu.addAction("Delete")
 
         action = menu.exec(event.globalPos())
+        
+        if action in adds:
 
-        if action == act_DEL:
-            print("NOTIMPLEMENTED STUB")
-        else:
-            if action in adds:
-                print("added", adds[action])
-                n = adds[action](self.graphics)
-                
-                n.setPos(
-                    self.mapToScene(event.globalPos())
-                )
+            print("added", adds[action])
+            n = adds[action](self.graphics)
+            
+            n.setPos(
+                self.mapToScene(event.globalPos())
+            )
 
     def mousePressEvent(self, event):
 
