@@ -35,6 +35,7 @@ class Edge(QGraphicsItem):
 
         offset = QPointF(EDGERADIUS+SOCKETRADIUS, 4*EDGERADIUS) - QPointF(*(self.fr.node.size if self.fr else self.to.node.size))
         poff = -QPointF(EDGERADIUS, EDGERADIUS)
+        sock_off = 4*self.fr.index*SOCKETRADIUS
         #print((self.fr if self.fr else self.to).node.scene.window.view.zoom)
 
         self.delta = (self.to.absPos() if self.to else self.point+poff) - (self.fr.absPos() if self.fr else self.point+poff)
@@ -42,7 +43,7 @@ class Edge(QGraphicsItem):
 
         self.setPos(self.fr.pos() + offset)
 
-        p1 = QPointF(0, 0)
+        p1 = QPointF(0, sock_off)
         p2 = self.delta
 
         grad = QLinearGradient(p1, p2)
@@ -52,7 +53,15 @@ class Edge(QGraphicsItem):
         pen = QPen(QBrush(grad), 2)
 
         path = QPainterPath(p1)
-        path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
+
+        cutoff = 7
+
+        if p1.x() - p2.x() < -EDGERADIUS*cutoff:
+
+            path.cubicTo( (1*p1.x()+p2.x())/2, p1.y(), (p1.x()+p2.x()*1)/2, p2.y(), p2.x(), p2.y())
+        else:
+            path.cubicTo( 2*p1.x() - (1*p1.x()+p2.x())/2 + EDGERADIUS*cutoff, p1.y(), p2.x() + (p1.x()+p2.x()*1)/2 - EDGERADIUS*cutoff, p2.y(), p2.x(), p2.y())
+
 
         outlinePen = QPen(QColor("#000"), 5)
 
@@ -197,7 +206,7 @@ class Node(QGraphicsItem):
             if sock.type == INPUT:
                 edge = sock.edges[0]
 
-                if edge.fr.node not in check and not edge.fr.node.circular:
+                if edge.fr.node not in check:
                     edge.fr.node.eval()
                     check.append(edge.fr.node)
                 

@@ -1,5 +1,7 @@
 from window import *
 
+from torch import Tensor
+
 class ValueNode(Node):
 
     def __init__(self, scene, id=""):
@@ -29,9 +31,20 @@ class ViewerNode(Node):
         self.button = self.addWidget(QPushButton("HUNGUS"))
         self.button.clicked.connect(self.eval)
 
-    def __eval__(self, value):
+    def update(self, to):
+        try:
+            self.button.setText(repr(
+                self.sockets[0].edges[0].value
+            ))
+            print(repr(
+                self.sockets[0].edges[0].value
+            ))
+        except:
+            self.button.setText("None")
 
-        self.button.setText(repr(value))
+    def __eval__(self, value):
+        self.update(None)
+        
 
 
 class MathNode(Node):
@@ -54,7 +67,23 @@ class MathNode(Node):
 
 import torch
 from torch import nn
+from torch.optim import Adam
 
+class MSELossNode(Node):
+
+    def __init__(self, scene):
+
+        self.size = (150, 100)
+
+        super().__init__(scene, "MSELoss")
+
+        Socket(self, "Value", "#40d080", type=INPUT)
+        Socket(self, "Target", "#40d080", type=INPUT)
+        Socket(self, "Loss", "#40d080", type=OUTPUT)
+
+    def __eval__(self, x, y):
+
+        return ((x - y)*(x - y)).mean()
 
 class LinearNode(Node):
 
@@ -87,19 +116,60 @@ class AdamNode(Node):
 
     def __init__(self, scene):
 
-        self.size = (150, 100)
+        self.size = (150, 150)
 
         super().__init__(scene, "Adam")
 
-        Socket(self, "Loss", "#40d080", type=INPUT)
-        Socket(self, "Optim", "#d0f080", type=OUTPUT)
+        Socket(self, "Weights", "#d0f080", type=OUTPUT)
+        self.loss_sock = Socket(self, "Backward Loss", "#40d080", type=INPUT)
 
-        #self.button = self.addWidget(QPushButton("OPTIM"))
-        #self.button.clicked.connect(self.eval)
+        self.button = self.addWidget(QPushButton("TRAIN EPOCH"))
+        self.button.clicked.connect(self.train)
 
-    def __eval__(self, loss):
+        self.adam = None
+        self.update(None)
 
-        raise KeyboardInterrupt
+    def update(self, to):
+        
+        print('update adam')
+
+        if hasattr(self, 'adam'):
+            del self.adam
+
+        for i in self.sockets[0].edges:
+            i = i.to.node
+            if hasattr(i, 'layer'):
+                if hasattr(self, 'adam'):
+                    self.adam.add_param_group(i.layer.parameters())
+                else:
+                    self.adam = Adam(i.layer.parameters())
+
+    def train(self):
+
+        try:
+            
+            self.loss_sock.edges[0].fr.node.eval()
+            loss = self.loss_sock.edges[0].value
+
+            print(f"Loss: {loss}")
+
+            loss.backward()
+            self.adam.step()
+        
+        except Exception as E:
+
+            self.title_item.setDefaultTextColor(QColor("#ff4040"))
+            self.title = self.title.replace(' (!)', '')
+            self.title += ' (!)'
+
+            print('=======')
+            print(f'During Eval of {self}')
+            print(traceback.format_exc())
+            print('=======')
+            self.title_item.setToolTip(repr(E).split('(')[0] + ': ' + str(E))
+
+    def eval(self):
+        pass
 
 
 View.availableNodes = [j for i, j in globals().items() if i.endswith("Node") and i != 'Node']
