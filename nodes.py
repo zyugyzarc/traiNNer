@@ -1,6 +1,7 @@
 from window import *
 
 from torch import Tensor
+import numpy as np
 
 class ValueNode(Node):
 
@@ -44,7 +45,6 @@ class ViewerNode(Node):
 
     def __eval__(self, value):
         self.update(None)
-        
 
 
 class MathNode(Node):
@@ -170,6 +170,40 @@ class AdamNode(Node):
 
     def eval(self):
         pass
+
+class ReLUNode(Node):
+    def __init__(self, scene, id=""):
+
+        super().__init__(scene, "ReLU")
+
+        Socket(self, "Value", "#40d080", type=INPUT)
+        Socket(self, "Value", "#40d080", type=OUTPUT)
+
+    def __eval__(self, val):
+        return (val + abs(val))/2
+
+class PythonNode(Node):
+
+    def __init__(self, scene, id=""):
+
+        self.size = (200, 250)
+
+        super().__init__(scene, "Python")
+
+        Socket(self, "Value", "#40d080", type=INPUT)
+        Socket(self, "Output","#40d080", type=OUTPUT)
+
+        self.textedit = QTextEdit("HUNGUS")
+        self.textedit.resize(150, 150)
+        self.addWidget(self.textedit, height=150)
+        
+
+    def __eval__(self, val):
+
+        op = self.textedit.toPlainText()
+        vars = dict(input=val, output=None)
+        exec(op, None, vars)
+        return vars['output']
 
 
 View.availableNodes = [j for i, j in globals().items() if i.endswith("Node") and i != 'Node']

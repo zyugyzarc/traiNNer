@@ -204,13 +204,16 @@ class Node(QGraphicsItem):
         inputs = []
         for sock in self.sockets:
             if sock.type == INPUT:
-                edge = sock.edges[0]
+                try:
+                    edge = sock.edges[0]
 
-                if edge.fr.node not in check:
-                    edge.fr.node.eval()
-                    check.append(edge.fr.node)
-                
-                inputs.append(edge.value)
+                    if edge.fr.node not in check:
+                        edge.fr.node.eval()
+                        check.append(edge.fr.node)
+                    
+                    inputs.append(edge.value)
+                except IndexError:
+                    inputs.append(None)
 
         try:
             outputs = self.__eval__(*inputs)
@@ -284,17 +287,18 @@ class Node(QGraphicsItem):
         return f"<Node {self._title}>"
 
     def __eval__(self, *_):
+
         print("INVALID __EVAL__()")
         return tuple()
 
-    def addWidget(self, widget):
+    def addWidget(self, widget, height=30):
 
         proxy = QGraphicsProxyWidget(self)
         proxy.setWidget(widget)
 
         self.widgets.append(proxy)
 
-        widget.setFixedHeight(30)
+        widget.setFixedHeight(height)
         widget.setFixedWidth(self.size[0] - EDGERADIUS*3)
 
         ypos = EDGERADIUS*3+4*(len([0 for i in self.sockets if i.type == INPUT]) + len(self.widgets) - 1)*SOCKETRADIUS
