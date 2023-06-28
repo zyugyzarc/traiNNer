@@ -2,7 +2,7 @@
 
 An application that lets you create neural nets (and other arbritary python code) visually, similar to blender's node systems.
 
-![.github/mnist.png]
+![](.github/mnist.png)
 
 ## Features
 
