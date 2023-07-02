@@ -174,6 +174,8 @@ class AdamNode(Node):
 class ReLUNode(Node):
     def __init__(self, scene, id=""):
 
+        self.size = (100, 90)
+
         super().__init__(scene, "ReLU")
 
         Socket(self, "Value", "#40d080", type=INPUT)

@@ -10,11 +10,17 @@ SOCKETRADIUS = 6
 INPUT = 0
 OUTPUT = 1
 
+def uuid():
+    from uuid import uuid4
+    return str(uuid4())
+
 class Edge(QGraphicsItem):
 
     def __init__(self, fromsock, tosock, point=None):
         
         super().__init__(fromsock)
+
+        self.id = "edge-"+uuid()
 
         self.setFlag(QGraphicsItem.ItemStacksBehindParent)
         if tosock: tosock.node.setZValue(fromsock.node.zValue()+1)
@@ -28,6 +34,8 @@ class Edge(QGraphicsItem):
         self.delta = (self.to.absPos() if self.to else self.point) - (self.fr.absPos() if self.fr else self.point)
 
         self.value = None
+
+        (self.fr if self.fr else self.to).node.scene.edges.append(self)
 
     def paint(self, painter, QStyleGraphicsItem, widget=None):
 
@@ -83,6 +91,16 @@ class Edge(QGraphicsItem):
             QPointF(0, 0),
             self.delta
         )
+
+    def save(self, d):
+
+        d[self.id] = dict(
+            to = self.to.node.id,
+            fr = self.fr.node.id,
+            to_index = self.to.node.sockets.index(self.to),
+            fr_index = self.fr.node.sockets.index(self.fr)
+        )
+        return d
 
 
 class Socket(QGraphicsItem):
@@ -165,6 +183,8 @@ class Node(QGraphicsItem):
     def __init__(self, scene, title="Undefined"):
 
         super().__init__()
+
+        self.id = str(type(self))[8:-2].split('.')[-1]+"-"+uuid()
 
         self.scene = scene
         
@@ -310,6 +330,26 @@ class Node(QGraphicsItem):
     def update(self, sock):
         pass
 
+    def save(self, d):
+
+        d[self.id] = dict(
+            pos=[self.pos().x(), self.pos().y()],
+            title=self.title,
+            sockets=[
+                dict(type=i.type, name=i.name, color=(
+                        i.color.color().red(),
+                        i.color.color().green(),
+                        i.color.color().blue(),
+                    )
+                )
+                for i in self.sockets
+            ],
+            widgets=[
+                #i.widget().toPlainText() for i in self.widgets
+            ]
+        )
+
+        return d
 
 
 class View(QGraphicsView):
@@ -349,6 +389,15 @@ class View(QGraphicsView):
         menu = QMenu()
         menu.addMenu(addMenu)
 
+        item = self.itemAt(event.pos())
+        delaction = None
+
+        if isinstance(item, Node) or isinstance(item, Socket):
+            delaction = menu.addAction("Delete")
+        
+        saveaction = menu.addAction("Save")
+        loadaction = menu.addAction("Load")
+
         action = menu.exec(event.globalPos())
         
         if action in adds:
@@ -359,6 +408,35 @@ class View(QGraphicsView):
             n.setPos(
                 self.mapToScene(event.globalPos())
             )
+
+        elif action == delaction:
+
+            if isinstance(item, Socket):
+                item = item.node
+
+            for sock in item.sockets:
+                while sock.edges:
+                    edge = sock.edges.pop()
+                    self.graphics.edges.remove(edge)
+                    
+                    self.graphics.removeItem(edge)
+                    del edge
+            
+                self.graphics.removeItem(sock)
+                del sock
+            
+            self.graphics.nodes.remove(item)
+            self.graphics.removeItem(item)
+            del item
+
+        elif action == saveaction:
+
+            self.graphics.save()
+
+        elif action == loadaction:
+
+            self.graphics.load()
+
 
     def mousePressEvent(self, event):
 
@@ -434,6 +512,7 @@ class View(QGraphicsView):
             self.viewport().repaint()
             #print(self.currentEdge.delta, self.currentEdge.to)
 
+
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -450,6 +529,7 @@ class View(QGraphicsView):
                 self.currentEdge.selected = False
             
             else:
+                self.graphics.edges.remove(self.currentEdge)
                 sip.delete(self.currentEdge)
                 del self.currentEdge
 
@@ -478,7 +558,6 @@ class View(QGraphicsView):
         self.scale(dzoom, dzoom)
 
 
-
 class Scene(QGraphicsScene):
 
     def __init__(self, window, parent=None):
@@ -487,6 +566,7 @@ class Scene(QGraphicsScene):
 
         self.window = window
         self.nodes = []
+        self.edges = []
 
         self.init_graphics()
 
@@ -542,6 +622,53 @@ class Scene(QGraphicsScene):
 
         painter.setPen(self._pen_dark)
         painter.drawLines(*lines_dark)
+
+    def save(self):
+
+        data = {}
+
+        for node in self.nodes:
+            data = node.save(data)
+
+        for edge in self.edges:
+            data = edge.save(data)
+
+        import json
+
+        print(data)
+        with open('filename.nod', 'w') as f:
+            json.dump(data, f)
+
+    def load(self):
+
+        import json
+
+        with open('filename.nod') as f:
+            data = json.load(f)
+
+        for i in data:
+            if not i.startswith("edge"): # Node
+
+                print("creating", i)
+                cls = [j for j in self.window.view.availableNodes if i.startswith(str(j)[8:-2].split('.')[-1])]
+                print(cls)
+                cls = cls[0]
+                inst = cls(self)
+                inst.id = i
+                inst.setPos(*data[i]['pos'])
+
+            else: # Edge
+
+                i = data[i]
+
+                print([j.id for j in self.nodes])
+
+                Edge(
+                    [j for j in self.nodes if j.id == i['fr']][0].sockets[i['fr_index']],
+                    [j for j in self.nodes if j.id == i['to']][0].sockets[i['to_index']]
+                )
+
+
 
 
 class AppWindow(QWidget):
