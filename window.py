@@ -345,7 +345,7 @@ class Node(QGraphicsItem):
                 for i in self.sockets
             ],
             widgets=[
-                #i.widget().toPlainText() for i in self.widgets
+                (i.widget().toPlainText() if type(i.widget()) in (QTextEdit,) else None) for i in self.widgets 
             ]
         )
 
@@ -355,6 +355,9 @@ class Node(QGraphicsItem):
 class View(QGraphicsView):
 
     availableNodes = []
+
+    def add_nodes(*nodes):
+        View.availableNodes += list(nodes)
 
     def __init__(self, graphics, parent=None):
 
@@ -382,7 +385,7 @@ class View(QGraphicsView):
 
         for node in self.availableNodes:
             adds[
-                addMenu.addAction(str(node).replace("<class 'nodes.", '').replace('Node\'>', ''))
+                addMenu.addAction(str(node).split('.')[-1].replace('Node\'>', ''))
             ] = node
 
 
@@ -568,6 +571,8 @@ class Scene(QGraphicsScene):
         self.nodes = []
         self.edges = []
 
+        self.filename = None
+
         self.init_graphics()
 
     def addNode(self, node):
@@ -636,14 +641,26 @@ class Scene(QGraphicsScene):
         import json
 
         print(data)
-        with open('filename.nod', 'w') as f:
+
+        if self.filename is None:
+            self.filename, _ = QFileDialog.getSaveFileName(None, 'Save File', "", "traiNNer Files (*.nod)")
+            self.filename += ".nod" if not self.filename.endswith(".nod") else ""
+
+        print(self.filename)
+
+        with open(self.filename, 'w') as f:
             json.dump(data, f)
+
+        self.window.setWindowTitle(f"{self.filename} - traiNNer")
 
     def load(self):
 
         import json
 
-        with open('filename.nod') as f:
+        #if self.filename is None:
+        self.filename, _ = QFileDialog.getOpenFileName(None, 'Open File', "", "traiNNer Files (*.nod)")
+
+        with open(self.filename) as f:
             data = json.load(f)
 
         for i in data:
@@ -656,6 +673,10 @@ class Scene(QGraphicsScene):
                 inst = cls(self)
                 inst.id = i
                 inst.setPos(*data[i]['pos'])
+                
+                for j, w in enumerate(inst.widgets):
+                    if type(w.widget()) in (QTextEdit,):
+                        w.widget().setPlainText(data[i]['widgets'][j])
 
             else: # Edge
 
@@ -667,6 +688,8 @@ class Scene(QGraphicsScene):
                     [j for j in self.nodes if j.id == i['fr']][0].sockets[i['fr_index']],
                     [j for j in self.nodes if j.id == i['to']][0].sockets[i['to_index']]
                 )
+
+        self.window.setWindowTitle(f"{self.filename} - traiNNer")
 
 
 
@@ -688,5 +711,5 @@ class AppWindow(QWidget):
 
         self.layout.addWidget(self.view)
 
-        self.setWindowTitle("traiNNer")
+        self.setWindowTitle("Untitled - traiNNer")
         self.show()

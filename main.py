@@ -1,5 +1,6 @@
 from window import * 
 from nodes import *
+from nn_nodes import *
 
 app = QApplication([])
 
