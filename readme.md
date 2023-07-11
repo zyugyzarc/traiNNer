@@ -13,7 +13,7 @@ An application that lets you create neural nets (and other arbritary python code
 
 ## Todo:
 
-* Save/Load files
+~~* Save/Load files~~
 * easier / more convinent dataloaders (or similar)
 
 ## Installation and Usage:
