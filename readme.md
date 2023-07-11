@@ -25,6 +25,9 @@ To execute,
 `$ python3 main.py`
 
 #### Shortcuts:
+
 `Ctrl+S`: Save
+
 `Ctrl+O`: Open file
+
 `Ctrl+A`: Add Node
