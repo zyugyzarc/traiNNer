@@ -168,7 +168,6 @@ class Socket(QGraphicsItem):
 
             edge.updateNodes()
 
-        print(f"connected {self} to {other}")
     
     def absPos(self):
         return self.pos() + self.node.pos()
@@ -351,10 +350,52 @@ class Node(QGraphicsItem):
 
         return d
 
+class QSearchMenu(QMenu):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._actions = []
+
+        self.textedit = QLineEdit("", self)
+        self.textedit.setPlaceholderText("Search")
+        self.textedit.textChanged.connect(self.search)
+        self.textedit.setFocus()
+
+        action = QWidgetAction(self)
+        action.setDefaultWidget(self.textedit)
+        self.textaction = self.addAction(action)
+
+    def addAction(self, action):
+        super().addAction(action)
+        action = self.actions()[-1]
+        self._actions.append(action)
+        self._actions.sort(key=lambda i: (len(i.text()), i.text()))
+        return action
+
+    def search(self, text):
+
+        for action in self._actions[1:]:
+            if text.lower() in action.text().lower():
+                action.setVisible(True)
+            else:
+                action.setVisible(False)
+
+    def exec(self, *args, **kwargs):
+
+        action = super().exec(*args, **kwargs)
+
+        if action == self.textaction:
+            for action in self._actions[1:]:
+                if action.isVisible():
+                    return action
+        return action
+
+
+
 
 class View(QGraphicsView):
 
-    availableNodes = []
+    availableNodes = {}
 
     def add_nodes(*nodes):
         View.availableNodes += list(nodes)
@@ -377,23 +418,113 @@ class View(QGraphicsView):
         self.currentEdge = None
         self.currentSocket = None
 
-    def contextMenuEvent(self, event):
+        self.make_shortcuts()
+
+    def make_shortcuts(self):
+
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.graphics.load)
+        QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.graphics.save)
+
+        QShortcut(QKeySequence("Shift+A"), self).activated.connect(self.add_menu)
+
+    def add_menu(self):
 
         addMenu = QMenu("Add Node")
+        submenus = []
 
         adds = {}
 
-        for node in self.availableNodes:
-            adds[
-                addMenu.addAction(str(node).split('.')[-1].replace('Node\'>', ''))
-            ] = node
+        add = addMenu.addAction("Search")
+
+        for submenu in self.availableNodes:
+
+            submenus.append(QMenu(submenu))
+
+            for node in self.availableNodes[submenu]:
+
+                adds[
+                    submenus[-1].addAction(node.__name__.replace('Node', ''))
+                ] = node
+
+            addMenu.addMenu(submenus[-1])
+
+        pos = QCursor.pos() - QPoint(EDGERADIUS, EDGERADIUS)
+
+        QTimer.singleShot(10, lambda: (
+            QCoreApplication.postEvent(addMenu, 
+                QKeyEvent(QEvent.KeyPress, Qt.Key_Down, Qt.NoModifier)
+            )
+        ))
+
+        action = addMenu.exec(pos)
+
+        if action == add:
+            self.add_menu_search()
+
+        if action in adds:
+
+            n = adds[action](self.graphics)
+            
+            n.setPos(self.mapToScene(self.mapFromGlobal(pos)))
+
+    def add_menu_search(self):
+
+        addMenu = QSearchMenu("Add Node")
+
+        adds = {}
+
+        for submenu in self.availableNodes:
+
+            for node in self.availableNodes[submenu]:
+
+                adds[
+                    addMenu.addAction(node.__module__.replace('Nodes',"")+"."+node.__name__.replace('Node', ''))
+                ] = node
+
+        pos = QCursor.pos() - QPoint(EDGERADIUS, EDGERADIUS)
+
+
+        QTimer.singleShot(10, lambda: (
+            QCoreApplication.postEvent(addMenu, 
+                QKeyEvent(QEvent.KeyPress, Qt.Key_Down, Qt.NoModifier)
+            )
+        ))
+
+        action = addMenu.exec(pos)
+
+        if action in adds:
+
+            n = adds[action](self.graphics)
+            
+            n.setPos(self.mapToScene(self.mapFromGlobal(pos)))
+
+    def contextMenuEvent(self, event):
+
+        addMenu = QMenu("Add Node")
+        submenus = []
+
+        adds = {}
+
+        add = addMenu.addAction("Search")
+
+        for submenu in self.availableNodes:
+
+            submenus.append(QMenu(submenu))
+
+            for node in self.availableNodes[submenu]:
+
+                adds[
+                    submenus[-1].addAction(str(node).split('.')[-1].replace('Node\'>', ''))
+                ] = node
+
+            addMenu.addMenu(submenus[-1])
 
 
         menu = QMenu()
         menu.addMenu(addMenu)
 
         item = self.itemAt(event.pos())
-        delaction = None
+        delaction = -1
 
         if isinstance(item, Node) or isinstance(item, Socket):
             delaction = menu.addAction("Delete")
@@ -403,9 +534,11 @@ class View(QGraphicsView):
 
         action = menu.exec(event.globalPos())
         
-        if action in adds:
+        if action == add:
+            self.add_search_menu()
 
-            print("added", adds[action])
+        elif action in adds:
+
             n = adds[action](self.graphics)
             
             n.setPos(
@@ -445,7 +578,6 @@ class View(QGraphicsView):
 
         if event.button() == Qt.LeftButton:
             item = self.itemAt(event.pos())
-            print("clicked on", item)
 
             if type(item) == Socket and item.type == OUTPUT:
                 for i in self.graphics.selectedItems():
@@ -468,8 +600,6 @@ class View(QGraphicsView):
                 self.currentEdge.to = None
 
                 self.currentEdge.point = self.mapToScene(event.pos())
-
-                print("unlink", self.currentEdge)
 
             else:
 
@@ -538,7 +668,6 @@ class View(QGraphicsView):
 
             self.currentEdge = None
 
-            print("mouse release")
 
         if event.button() == Qt.MiddleButton:
 

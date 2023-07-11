@@ -1,6 +1,7 @@
 from window import * 
-from nodes import *
-from nn_nodes import *
+
+from baseNodes import *
+from torchNodes import *
 
 app = QApplication([])
 
