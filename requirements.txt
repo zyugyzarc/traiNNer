@@ -1,0 +1,8 @@
+pyqt5
+sip
+traceback
+json
+uuid
+
+# pytorch nodes depends on torch
+# see <https://pytorch.org/get-started/locally>
