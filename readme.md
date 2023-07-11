@@ -22,7 +22,7 @@ An application that lets you create neural nets (and other arbritary python code
 `$ pip install -r requirements.txt` (Note: pytorch nodes depends on torch, see <https://pytorch.org/get-started/locally>)
 
 To execute,  
-`$ python3 main.py`
+`$ python3 .`
 
 #### Shortcuts:
 

@@ -10,11 +10,11 @@ class ValueNode(Node):
 
         Socket(self, "Output", "#fff", type=OUTPUT)
 
-        self.textedit = self.addWidget(QTextEdit("HUNGUS"))
+        self.textedit = self.addWidget(QLineEdit("HUNGUS"))
 
     def __eval__(self):
 
-        return eval(self.textedit.toPlainText())
+        return eval(self.textedit.text())
 
 class ViewerNode(Node):
 
@@ -74,7 +74,7 @@ class PythonNode(Node):
 
         self.textedit = QTextEdit("HUNGUS")
         self.textedit.resize(150, 150)
-        self.addWidget(self.textedit, height=150)
+        self.addWidget(self.textedit, lambda w:w.setFixedHeight(150))
         
 
     def __eval__(self, val):

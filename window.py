@@ -14,6 +14,9 @@ def uuid():
     from uuid import uuid4
     return str(uuid4())
 
+def title(s):
+    return s.title() if s == s.lower() else s
+
 class Edge(QGraphicsItem):
 
     def __init__(self, fromsock, tosock, point=None):
@@ -310,19 +313,21 @@ class Node(QGraphicsItem):
         print("INVALID __EVAL__()")
         return tuple()
 
-    def addWidget(self, widget, height=30):
+    def addWidget(self, widget, func=None):
 
         proxy = QGraphicsProxyWidget(self)
         proxy.setWidget(widget)
 
         self.widgets.append(proxy)
 
-        widget.setFixedHeight(height)
         widget.setFixedWidth(self.size[0] - EDGERADIUS*3)
+
 
         ypos = EDGERADIUS*3+4*(len([0 for i in self.sockets if i.type == INPUT]) + len(self.widgets) - 1)*SOCKETRADIUS
         
         proxy.setPos(EDGERADIUS, EDGERADIUS*2 + ypos)
+
+        if func: func(widget)
 
         return widget
 
@@ -477,8 +482,9 @@ class View(QGraphicsView):
 
             for node in self.availableNodes[submenu]:
 
+
                 adds[
-                    addMenu.addAction(node.__module__.replace('Nodes',"")+"."+node.__name__.replace('Node', ''))
+                    addMenu.addAction(node.__module__.replace('Nodes',"").replace('_', '.')+"."+node.__name__.replace('Node', ''))
                 ] = node
 
         pos = QCursor.pos() - QPoint(EDGERADIUS, EDGERADIUS)
