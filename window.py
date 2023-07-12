@@ -812,9 +812,6 @@ class Scene(QGraphicsScene):
         for i in data:
             if not i.startswith("edge"): # Node
 
-
-                # deal with new node arangement
-
                 print("creating", i)
                 cls = [k for j in self.window.view.availableNodes.values() for k in j if i.startswith(str(k)[8:-2].split('.')[-1])]
                 cls = cls[0]
