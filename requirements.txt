@@ -3,6 +3,7 @@ sip
 traceback
 json
 uuid
+matplotlib
 
 # pytorch nodes depends on torch
 # see <https://pytorch.org/get-started/locally>

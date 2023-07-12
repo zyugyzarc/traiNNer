@@ -10,6 +10,16 @@ SOCKETRADIUS = 6
 INPUT = 0
 OUTPUT = 1
 
+"""
+COLORS:
+
+#40d080 - Tensor
+#D0f080 - Optim/Weights
+#ffffff - Any/Generic/Python
+
+#0080f0 - Int/Float/Numeric/Scalar
+"""
+
 def uuid():
     from uuid import uuid4
     return str(uuid4())
@@ -321,6 +331,7 @@ class Node(QGraphicsItem):
         self.widgets.append(proxy)
 
         widget.setFixedWidth(self.size[0] - EDGERADIUS*3)
+        widget.setMaximumHeight(self.size[1] - EDGERADIUS*6 - EDGERADIUS*3*len(self.sockets))
 
 
         ypos = EDGERADIUS*3+4*(len([0 for i in self.sockets if i.type == INPUT]) + len(self.widgets) - 1)*SOCKETRADIUS
@@ -801,10 +812,13 @@ class Scene(QGraphicsScene):
         for i in data:
             if not i.startswith("edge"): # Node
 
+
+                # deal with new node arangement
+
                 print("creating", i)
-                cls = [j for j in self.window.view.availableNodes if i.startswith(str(j)[8:-2].split('.')[-1])]
-                print(cls)
+                cls = [k for j in self.window.view.availableNodes.values() for k in j if i.startswith(str(k)[8:-2].split('.')[-1])]
                 cls = cls[0]
+
                 inst = cls(self)
                 inst.id = i
                 inst.setPos(*data[i]['pos'])
